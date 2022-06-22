@@ -54,3 +54,17 @@ def test_lambda_function_created():
             'INGEST_BUCKET': {'Ref': 'IngestBucket2B3522FA'}
         }
     }
+
+def test_event_created():
+    app = App()
+
+    test_stack = WttrInDataStack(app, "TestStack")
+
+    template = assertions.Template.from_stack(test_stack)
+    
+    template.resource_count_is('AWS::Events::Rule', 1)
+    
+    template.has_resource_properties('AWS::Events::Rule', {
+        'ScheduleExpression': 'cron(0 * ? * * *)',
+        'State': 'ENABLED'
+    })
