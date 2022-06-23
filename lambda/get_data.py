@@ -32,8 +32,8 @@ def save_to_s3(data, event_time):
     s3.put_object(
         Bucket=INGEST_BUCKET,
         Body=data,
-        Key=f'weather-data/Melbourne/{event_time}.json',
-        ContentType='application/json'
+        Key=f'weather-data-raw/Melbourne/{event_time}.json',
+        ContentType='application/json',
     )
 
     logger.info('Data saved to s3')
@@ -49,7 +49,7 @@ def handler(event, context):
         body = {
             'uploaded': 'true',
             'bucket': INGEST_BUCKET,
-            'path': f'weather-data/Melbourne/{event["time"]}.json'
+            'path': f'weather-data-raw/Melbourne/{event["time"]}.json'
         }
 
     else:
