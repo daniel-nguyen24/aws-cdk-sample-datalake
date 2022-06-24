@@ -9,11 +9,13 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 INGEST_BUCKET = os.environ['INGEST_BUCKET']
+RAW_DATA_PATH = os.environ['RAW_DATA_PATH']
+LOCATION_QUERY_STRING = os.environ['LOCATION_QUERY_STRING']
 
 
-def get_weather_data():
+def get_weather_data(query_string):
     logger.info('Get weather data from wttr.in')
-    data_request = requests.get('https://wttr.in/Melbourne+VIC?format=j1')
+    data_request = requests.get(f'https://wttr.in/{query_string}?format=j1')
 
     try:
         data_request.raise_for_status()
@@ -32,7 +34,7 @@ def save_to_s3(data, event_time):
     s3.put_object(
         Bucket=INGEST_BUCKET,
         Body=data,
-        Key=f'weather-data-raw/Melbourne/{event_time}.json',
+        Key=f'{RAW_DATA_PATH}/{event_time}.json',
         ContentType='application/json',
     )
 
@@ -41,7 +43,7 @@ def save_to_s3(data, event_time):
 
 def handler(event, context):
 
-    weather_data = get_weather_data()
+    weather_data = get_weather_data(LOCATION_QUERY_STRING.replace(' ', '+'))
 
     if weather_data.status_code == 200:
         save_to_s3(weather_data.content, event['time'])
@@ -49,7 +51,7 @@ def handler(event, context):
         body = {
             'uploaded': 'true',
             'bucket': INGEST_BUCKET,
-            'path': f'weather-data-raw/Melbourne/{event["time"]}.json'
+            'path': f'{RAW_DATA_PATH}/{event["time"]}.json'
         }
 
     else:
