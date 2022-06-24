@@ -114,6 +114,7 @@ class WttrInDataStack(Stack):
             )
         )
 
+        # Create Glue ETL job to flatten data and save to S3 as parquet files
         glue_etl_job = aws_glue_alpha.Job(
             self, 'WttrETLJob',
             executable=aws_glue_alpha.JobExecutable.python_etl(
@@ -133,3 +134,5 @@ class WttrInDataStack(Stack):
                 '--tempDir': 's3://' + ingest_bucket.bucket_name + '/glue/temp/',
             }
         )
+        
+        

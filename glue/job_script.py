@@ -92,12 +92,15 @@ cols_to_drop = [
 flatRootDf = flatRootDf.drop_fields(cols_to_drop).toDF()
 flatRootDf = flatRootDf.withColumn('localObsTimeStamp', to_timestamp(
     flatRootDf['`current_condition.val.localObsDateTime`'], 'yyyy-MM-dd h:mm a'))
+flatRootDf = flatRootDf.withColumn(
+    'localObsDate', to_date('localObsTimeStamp'))
 
 flatRootDf = DynamicFrame.fromDF(flatRootDf, glueContext, name='curatedData')
 result = flatRootDf = ApplyMapping.apply(frame=flatRootDf, mappings=[
     ("id", "`id`", "long"),
     ("index", "`index`", "int"),
     ("localObsTimeStamp", "`localObsTimeStamp`", "timestamp"),
+    ("localObsDate", "`localObsDate`", "date"),
     ("`current_condition.val.FeelsLikeC`", "FeelsLikeC", "int"),
     ("`current_condition.val.FeelsLikeF`", "FeelsLikeF", "int"),
     ("`current_condition.val.cloudcover`", "cloudcover", "int"),
@@ -129,7 +132,8 @@ glueContext.write_dynamic_frame.from_options(
     connection_options={
         'path': GLUE_OUTPUT_DIR,
         'partitionKeys': [
-            'areaName'
+            'areaName',
+            'localObsDate'
         ]
     },
     format='parquet'
