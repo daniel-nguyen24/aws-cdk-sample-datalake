@@ -9,7 +9,8 @@ from aws_cdk import (
     aws_events_targets,
     aws_glue_alpha,
     aws_glue,
-    aws_iam
+    aws_iam,
+    CfnParameter
 )
 
 from constructs import Construct
@@ -19,6 +20,34 @@ class WttrInDataStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Stack parameters
+        S3_INGEST_BUCKET_NAME = CfnParameter(
+            self, 'S3IngestBucketName',
+            type='String',
+            description='Name of S3 bucket to store ingest data',
+        )
+
+        S3_INGEST_RAW_DATA_PATH = CfnParameter(
+            self, 'S3IngestRawDataPath',
+            type='String',
+            description='Path to raw data in S3 ingest bucket',
+            default='weather-data-raw'
+        )
+
+        S3_INGEST_PARQUET_DATA_PATH = CfnParameter(
+            self, 'S3IngestParquetDataPath',
+            type='String',
+            description='Path to parquet data in S3 ingest bucket',
+            default='weather-data-parquet'
+        )
+
+        LOCATION_QUERY_STRING = CfnParameter(
+            self, 'LocationQueryString',
+            type='String',
+            description='Location query string for weather data',
+            default='Melbourne VIC'
+        )
+
         # Create KMS Key
         my_kms_key = aws_kms.Key(
             self, 'MyKMSKey',
@@ -27,16 +56,26 @@ class WttrInDataStack(Stack):
             removal_policy=RemovalPolicy.DESTROY
         )
 
-        # Create S3 Ingest bucket
-        ingest_bucket = aws_s3.Bucket(
-            self, "IngestBucket",
-            bucket_name="wttr-in-data-ingest",
-            versioned=True,
-            removal_policy=RemovalPolicy.DESTROY,
-            encryption=aws_s3.BucketEncryption.KMS,
-            encryption_key=my_kms_key,
-            enforce_ssl=True,
-        )
+        # Create S3 Ingest bucket with optionally provided bucket name.
+        if S3_INGEST_BUCKET_NAME.value is not None:
+            ingest_bucket = aws_s3.Bucket(
+                self, "IngestBucket",
+                bucket_name=S3_INGEST_BUCKET_NAME.value_as_string,
+                versioned=True,
+                removal_policy=RemovalPolicy.DESTROY,
+                encryption=aws_s3.BucketEncryption.KMS,
+                encryption_key=my_kms_key,
+                enforce_ssl=True,
+            )
+        else:
+            ingest_bucket = aws_s3.Bucket(
+                self, "IngestBucket",
+                versioned=True,
+                removal_policy=RemovalPolicy.DESTROY,
+                encryption=aws_s3.BucketEncryption.KMS,
+                encryption_key=my_kms_key,
+                enforce_ssl=True,
+            )
 
         # Create lambda function to obtain data from wttr.in
         get_data_lambda = aws_lambda.Function(
@@ -47,9 +86,8 @@ class WttrInDataStack(Stack):
             timeout=Duration.seconds(10),
             environment={
                 'INGEST_BUCKET': ingest_bucket.bucket_name,
-                # Hardcoded for only Melbourne for now
-                'LOCATION_QUERY_STRING': 'Melbourne VIC',
-                'RAW_DATA_PATH': 'weather-data-raw'
+                'LOCATION_QUERY_STRING': LOCATION_QUERY_STRING.value_as_string,
+                'RAW_DATA_PATH': S3_INGEST_RAW_DATA_PATH.value_as_string
             },
         )
 
@@ -101,7 +139,8 @@ class WttrInDataStack(Stack):
             name='wttr_in_raw_data_crawler',
             targets=aws_glue.CfnCrawler.TargetsProperty(
                 s3_targets=[aws_glue.CfnCrawler.S3TargetProperty(
-                    path='s3://' + ingest_bucket.bucket_name + '/weather-data-raw/',
+                    path='s3://' + ingest_bucket.bucket_name +
+                    f'/{S3_INGEST_RAW_DATA_PATH.value_as_string}/',
                 )]
             ),
             database_name=glue_database.database_name,
@@ -121,7 +160,8 @@ class WttrInDataStack(Stack):
             name='wttr_in_parquet_data_crawler',
             targets=aws_glue.CfnCrawler.TargetsProperty(
                 s3_targets=[aws_glue.CfnCrawler.S3TargetProperty(
-                    path='s3://' + ingest_bucket.bucket_name + '/weather-data-parquet/',
+                    path='s3://' + ingest_bucket.bucket_name +
+                    f'/{S3_INGEST_PARQUET_DATA_PATH.value_as_string}/',
                 )]
             ),
             database_name=glue_database.database_name,
@@ -149,8 +189,8 @@ class WttrInDataStack(Stack):
             worker_type=aws_glue_alpha.WorkerType.STANDARD,
             default_arguments={
                 '--glue_src_db': glue_database.database_name,
-                '--glue_src_tbl': 'weather_data_raw',
-                '--outputDir': 's3://' + ingest_bucket.bucket_name + '/weather-data-parquet/',
+                '--glue_src_tbl': f'{S3_INGEST_RAW_DATA_PATH}',
+                '--outputDir': 's3://' + ingest_bucket.bucket_name + f'/{S3_INGEST_PARQUET_DATA_PATH.value_as_string}/',
                 '--tempDir': 's3://' + ingest_bucket.bucket_name + '/glue/temp/',
             }
         )
