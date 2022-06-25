@@ -189,7 +189,7 @@ class WttrInDataStack(Stack):
             worker_type=aws_glue_alpha.WorkerType.STANDARD,
             default_arguments={
                 '--glue_src_db': glue_database.database_name,
-                '--glue_src_tbl': f'{S3_INGEST_RAW_DATA_PATH}',
+                '--glue_src_tbl': f'{S3_INGEST_RAW_DATA_PATH.value_as_string}',
                 '--outputDir': 's3://' + ingest_bucket.bucket_name + f'/{S3_INGEST_PARQUET_DATA_PATH.value_as_string}/',
                 '--tempDir': 's3://' + ingest_bucket.bucket_name + '/glue/temp/',
             }
