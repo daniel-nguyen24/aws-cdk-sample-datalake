@@ -94,14 +94,34 @@ class WttrInDataStack(Stack):
         # Grant Encrypt and Decrypt to Glue crawler's IAM role
         my_kms_key.grant_encrypt_decrypt(glue_crawler_role)
 
-        # Create Glue Crawler - Manual execution
-        glue_crawler = aws_glue.CfnCrawler(
-            self, 'WttrCrawler',
+        # Create Glue Crawler for raw data
+        glue_crawler_raw = aws_glue.CfnCrawler(
+            self, 'WttrRawCrawler',
             role=glue_crawler_role.role_arn,
-            name='wttr_in_data_crawler',
+            name='wttr_in_raw_data_crawler',
             targets=aws_glue.CfnCrawler.TargetsProperty(
                 s3_targets=[aws_glue.CfnCrawler.S3TargetProperty(
                     path='s3://' + ingest_bucket.bucket_name + '/weather-data-raw/',
+                )]
+            ),
+            database_name=glue_database.database_name,
+            schema_change_policy=aws_glue.CfnCrawler.SchemaChangePolicyProperty(
+                delete_behavior='LOG',
+                update_behavior='UPDATE_IN_DATABASE'
+            ),
+            recrawl_policy=aws_glue.CfnCrawler.RecrawlPolicyProperty(
+                recrawl_behavior='CRAWL_EVERYTHING'
+            )
+        )
+
+        # Create Glue Crawler for parquet data
+        glue_crawler_parquet = aws_glue.CfnCrawler(
+            self, 'WttrParquetCrawler',
+            role=glue_crawler_role.role_arn,
+            name='wttr_in_parquet_data_crawler',
+            targets=aws_glue.CfnCrawler.TargetsProperty(
+                s3_targets=[aws_glue.CfnCrawler.S3TargetProperty(
+                    path='s3://' + ingest_bucket.bucket_name + '/weather-data-parquet/',
                 )]
             ),
             database_name=glue_database.database_name,
@@ -134,5 +154,74 @@ class WttrInDataStack(Stack):
                 '--tempDir': 's3://' + ingest_bucket.bucket_name + '/glue/temp/',
             }
         )
-        
-        
+
+        # Create glue workflow
+        glue_workflow = aws_glue.CfnWorkflow(
+            self, 'WttrWorkflow',
+            name='wttr_in_workflow',
+            description='Workflow to crawl raw data, ETL and save to S3 as parquet files, and crawl parquet data'
+        )
+
+        # Create raw data crawler trigger
+        crawl_raw_data_trigger = aws_glue.CfnTrigger(
+            self, "CrawlRawDataTrigger",
+            actions=[aws_glue.CfnTrigger.ActionProperty(
+                crawler_name=glue_crawler_raw.name,
+                timeout=300
+            )],
+            name=f'Run raw data crawler - {glue_crawler_raw.name}',
+            description='Crawl raw data daily at 03:00',
+            workflow_name=glue_workflow.name,
+            type='SCHEDULED',
+            schedule='cron(0 3 * * ? *)',
+            start_on_creation=True,
+        )
+
+        # crawl_raw_data_trigger.add_depends_on(glue_crawler_raw)
+        # crawl_raw_data_trigger.add_depends_on(glue_workflow)
+
+        # Create etl job trigger
+        glue_etl_job_trigger = aws_glue.CfnTrigger(
+            self, 'WttrETLJobTrigger',
+            actions=[aws_glue.CfnTrigger.ActionProperty(
+                job_name=glue_etl_job.job_name,
+                timeout=300
+            )],
+            name=f'Run ETL job - {glue_etl_job.job_name}',
+            description='Run ETL job after raw data crawler',
+            workflow_name=glue_workflow.name,
+            type='CONDITIONAL',
+            predicate=aws_glue.CfnTrigger.PredicateProperty(
+                conditions=[aws_glue.CfnTrigger.ConditionProperty(
+                    crawler_name=glue_crawler_raw.name,
+                    logical_operator='EQUALS',
+                    crawl_state='SUCCEEDED'
+                )]
+            ),
+            start_on_creation=True,
+        )
+
+        # glue_etl_job_trigger.add_depends_on(glue_workflow)
+        # Since aws_glue_alpha is experimental, the dependency below is not added because it would return an error: Object of type @aws-cdk/aws-glue-alpha.Job is not convertible to aws-cdk-lib.CfnResource
+        # glue_etl_job_trigger.add_depends_on(glue_etl_job)
+
+        # Create parquet data crawler trigger
+        crawl_parquet_data_trigger = aws_glue.CfnTrigger(
+            self, "CrawlParquetDataTrigger",
+            actions=[aws_glue.CfnTrigger.ActionProperty(
+                crawler_name=glue_crawler_parquet.name,
+                timeout=300
+            )],
+            name=f'Run parquet data crawler - {glue_crawler_parquet.name}',
+            description='Crawl parquet data after ETL job',
+            workflow_name=glue_workflow.name,
+            type='CONDITIONAL',
+            predicate=aws_glue.CfnTrigger.PredicateProperty(
+                conditions=[aws_glue.CfnTrigger.ConditionProperty(
+                    job_name=glue_etl_job.job_name,
+                    logical_operator='EQUALS',
+                    state='SUCCEEDED',
+                )]
+            ),
+            start_on_creation=True,
+        )
