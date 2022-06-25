@@ -21,7 +21,7 @@ class WttrInDataStack(Stack):
 
         # Create KMS Key
         my_kms_key = aws_kms.Key(
-            self, 'MyKey',
+            self, 'MyKMSKey',
             enable_key_rotation=True,
             pending_window=Duration.days(7),
             removal_policy=RemovalPolicy.DESTROY
@@ -58,7 +58,7 @@ class WttrInDataStack(Stack):
 
         # Create event rule to trigger lambda function every hour
         extract_rule = aws_events.Rule(
-            self, "hourlyRule",
+            self, "HourlyRule",
             schedule=aws_events.Schedule.cron(
                 minute='0',
                 hour='*',
@@ -225,7 +225,7 @@ class WttrInDataStack(Stack):
             ),
             start_on_creation=True,
         )
-        
+
         crawl_parquet_data_trigger.add_depends_on(glue_crawler_parquet)
         crawl_parquet_data_trigger.add_depends_on(glue_workflow)
         crawl_parquet_data_trigger.add_depends_on(crawl_raw_data_trigger)
