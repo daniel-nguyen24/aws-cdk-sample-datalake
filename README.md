@@ -46,12 +46,12 @@ This repository is an experiment in using the AWS CDK to create a simple data in
 `S3IngestRawDataPath`
 
 - Path to raw data in S3 bucket
-- Default: `weather-raw-data`
+- Default: **weather-raw-data**
 
 `S3IngestParquetDataPath`
 
 - Path to parquet data in S3 bucket
-- Default: `weather-parquet-data`
+- Default: **weather-parquet-data**
 
 `LocationQueryString`
 
@@ -59,7 +59,7 @@ This repository is an experiment in using the AWS CDK to create a simple data in
   ```python
   sample_request = requests.get(f'https://wttr.in/{LocationQueryString}?format=j1')
   ```
-- Default: `Melbourne VIC`
+- Default: **Melbourne VIC**
 
 ## Deploy
 
