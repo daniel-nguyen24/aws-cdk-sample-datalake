@@ -177,8 +177,8 @@ class WttrInDataStack(Stack):
             start_on_creation=True,
         )
 
-        # crawl_raw_data_trigger.add_depends_on(glue_crawler_raw)
-        # crawl_raw_data_trigger.add_depends_on(glue_workflow)
+        crawl_raw_data_trigger.add_depends_on(glue_crawler_raw)
+        crawl_raw_data_trigger.add_depends_on(glue_workflow)
 
         # Create etl job trigger
         glue_etl_job_trigger = aws_glue.CfnTrigger(
@@ -201,7 +201,7 @@ class WttrInDataStack(Stack):
             start_on_creation=True,
         )
 
-        # glue_etl_job_trigger.add_depends_on(glue_workflow)
+        glue_etl_job_trigger.add_depends_on(glue_workflow)
         # Since aws_glue_alpha is experimental, the dependency below is not added because it would return an error: Object of type @aws-cdk/aws-glue-alpha.Job is not convertible to aws-cdk-lib.CfnResource
         # glue_etl_job_trigger.add_depends_on(glue_etl_job)
 
@@ -225,3 +225,8 @@ class WttrInDataStack(Stack):
             ),
             start_on_creation=True,
         )
+        
+        crawl_parquet_data_trigger.add_depends_on(glue_crawler_parquet)
+        crawl_parquet_data_trigger.add_depends_on(glue_workflow)
+        crawl_parquet_data_trigger.add_depends_on(crawl_raw_data_trigger)
+        crawl_parquet_data_trigger.add_depends_on(glue_etl_job_trigger)
