@@ -31,14 +31,14 @@ class WttrInDataStack(Stack):
             self, 'S3IngestRawDataPath',
             type='String',
             description='Path to raw data in S3 ingest bucket',
-            default='weather-data-raw'
+            default='weather_data_raw'
         )
 
         S3_INGEST_PARQUET_DATA_PATH = CfnParameter(
             self, 'S3IngestParquetDataPath',
             type='String',
             description='Path to parquet data in S3 ingest bucket',
-            default='weather-data-parquet'
+            default='weather_data_parquet'
         )
 
         LOCATION_QUERY_STRING = CfnParameter(
